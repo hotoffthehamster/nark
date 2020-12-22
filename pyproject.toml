@@ -35,3 +35,13 @@ requires = ["setuptools", "wheel"]
 [tool.pytest.ini_options]
 addopts = "--tb=short --strict-markers -ra"
 
+# FIXME/2020-12-21 10:52: Test w/ and w/o the --switches, and test diff. -rXXX options.
+#
+# 2020-12-13: (lb): TBH, not sure where I got these options from, or why,
+#                   probably from hamster-cli and I just never removed them
+#                   or understood if-why I needed them.
+#
+# addopts = "--tb=short --strict-markers -rsx"
+#
+# 2020-12-20 12:50: -rA shows summary of each passed. If nothing to warn -ra like default/not specified.
+

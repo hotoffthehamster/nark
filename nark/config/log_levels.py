@@ -22,6 +22,8 @@ import sys
 
 from gettext import gettext as _
 
+# FIXME/MAYBE/2020-12-14 01:57: Move to (new) easy-as-pypi-logger ???
+
 __all__ = (
     'must_verify_log_level',
     'get_log_level_safe',

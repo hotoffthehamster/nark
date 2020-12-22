@@ -30,6 +30,17 @@ from nark.config import decorate_config
 # Register the fact_factory, etc.
 from nark.tests.item_factories import *  # noqa: F401, F403
 
+pytest_plugins = (
+# 2020-12-22: So far not needed.
+    # Import tmp_appdirs fixture.
+#    'easy_as_pypi_apppth.test_mock',
+
+    # Set KeyChainedValue._envvar_prefix.
+#    'tests.config.envvar_prefix',
+    # Call app_dirs.register_application.
+#    'tests.config.init_app_dirs',
+)
+
 
 # This fixture is used by ``test_helpers`` and ``test_storage``.
 @pytest.fixture

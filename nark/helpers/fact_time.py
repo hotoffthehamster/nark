@@ -170,7 +170,7 @@ def must_be_datetime_or_relative(dt):
 
 def must_not_start_after_end(range_tuple):
     """
-    Perform basic sanity checks on a timeframe.
+    Perform basic validation on a timeframe.
 
     Args:
         range_tuple (tuple): ``(start, end)`` tuple.

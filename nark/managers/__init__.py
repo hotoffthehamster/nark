@@ -22,7 +22,7 @@ Base classes for implementing storage backends.
 
 Note:
     * This is propably going to be replaced by a ``ABC``-bases solution.
-    * Basic sanity checks could be done here then. This would mean we just need
+    * Basic validation could be done here then. This would mean we just need
       to test them once and our actual backends focus on the CRUD implementation.
 """
 

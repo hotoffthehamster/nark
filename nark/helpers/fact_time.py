@@ -139,7 +139,7 @@ RE_PATTERN_RELATIVE_CLOCK = re.compile(
 # HARDCODED: There's an 'h' and 'm' in this regex.
 # FIXME: (lb): The 'h' and 'm' are not part of i18n, not l10n-friendly.
 RE_PATTERN_RELATIVE_DELTA = re.compile(
-    '^(?P<signage>[-+])?((?P<hours>\d+)h)?((?P<minutes>\d{1,2})m?)?$'
+    '^(?P<signage>[-+])?((?P<hours>\d+)h)?((?P<minutes>\d+)m?)?$'
 )
 
 

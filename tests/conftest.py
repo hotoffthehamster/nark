@@ -27,7 +27,7 @@ from nark.manager import BaseStore
 # (lb): I might be doing this wrong, but works: So that downstream packages can
 # reuse (DRY) nark fixtures, such fixtures are defined in the public package.
 # - Note that I tried pytest_plugins, but didn't work, e.g.,
-#     pytest_plugins = ("nark.tests", "nark.tests.conftest", ...)
+#     pytest_plugins = ('nark.tests', 'nark.tests.conftest', ...)
 #   then:
 #     $ py.test
 #     ...
@@ -47,8 +47,8 @@ from nark.manager import BaseStore
 from nark.tests.conftest import *  # noqa: F401, F403
 
 pytest_plugins = (
-    "tests.config.envvar_prefix",
-    "tests.config.init_app_dirs",
+    'tests.config.envvar_prefix',
+    'tests.config.init_app_dirs',
 )
 
 

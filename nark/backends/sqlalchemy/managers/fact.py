@@ -504,6 +504,9 @@ class FactManager(GatherFactManager):
                 # The Active Fact.
                 ref_time = fact.start
         if not isinstance(ref_time, datetime):
+            # This branch reachable from factoid_fixture tests. See:
+            #   raw_fact: 'Monday-13:00: foo@bar', time_hint: 'verify_both'
+            #   raw_fact: '2015-12-12 13:00 foo@bar', time_hint: 'verify_both'
             raise ValueError(_('No reference time for antecedent(fact).'))
 
         ref_time = query_prepare_datetime(ref_time)
@@ -633,10 +636,11 @@ class FactManager(GatherFactManager):
             if fact.start and isinstance(fact.start, datetime):
                 ref_time = fact.start
             elif fact.end and isinstance(fact.end, datetime):
-                # EXPLAIN: A Fact with no start, but it has an end?
-                # FIXME/SPIKE: (lb): Investigate this. There is a test- in dob!:
-                #                      py.test -x tests/facts/test_add_fact.py
-                self.store.logger.warning('Unexpected path!')
+                # A Fact whose start None or not Datetime, but has an end.
+                # - E.g., start is None or '+10m'; end is Datetime.
+                # - See factoid_fixture -- a number of tests branch here.
+                #     py.test -x tests/facts/test_add_fact.py
+                #     py.test -x -s -k test_add_new_fact tests/
                 ref_time = fact.end
         if ref_time is None:
             raise ValueError(_('No reference time for subsequent(fact).'))

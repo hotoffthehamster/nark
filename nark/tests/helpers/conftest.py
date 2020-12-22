@@ -19,6 +19,11 @@
 
 import datetime
 
+# Run from dob:
+#   py.test -x -s -k test_add_new_fact tests/
+# Run from nark:
+#   py.test -x -s -k ??? tests/
+
 # CAVEAT: Note that freeze_time expected to be used with this!
 #  @freeze_time('2015-12-25 18:00')
 factoid_fixture = (
@@ -66,19 +71,27 @@ factoid_fixture = (
             'warnings': [],
         }),
 
-        # MAYBE/2020-07-03: Note that "clock-clock" works (no spaces around dash)
-        # but that "friendly-clock", "clock-friendly", etc., does not.
-        # - For consistency, perhaps this should be fixed... or at least documented
-        #   that it doesn't.
+        # 2020-12-22: Note that "datish-datish" works (no spaces around dash)
+        # if there's only a single dash in the datetime portion being parsed.
+        # Note freeze_time('2015-12-25 18:00') is Friday, so 2020-12-21 start.
         ('Monday-13:00: foo@bar', 'verify_both', {
-            'err': 'Expected to find the two datetimes separated by one of: ',
+            'start_raw': datetime.datetime(2015, 12, 21, 0, 0, 0),
+            'end_raw': '13:00',
+            'start': datetime.datetime(2015, 12, 21, 0, 0, 0),
+            # fix_clock_times_relative uses start to end same day, not now.
+            'end': datetime.datetime(2015, 12, 21, 13, 0, 0),
+            'activity': 'foo',
+            'category': 'bar',
+            'tags': [],
+            'description': '',
+            'warnings': [],
         }),
 
         ('Monday - 13:00: foo@bar', 'verify_both', {
             'start_raw': datetime.datetime(2015, 12, 21, 0, 0, 0),
             'end_raw': '13:00',
             'start': datetime.datetime(2015, 12, 21, 0, 0, 0),
-            'end': datetime.datetime(2015, 12, 25, 13, 0, 0),
+            'end': datetime.datetime(2015, 12, 21, 13, 0, 0),
             'activity': 'foo',
             'category': 'bar',
             'tags': [],
@@ -190,11 +203,21 @@ factoid_fixture = (
         #   elif strictly_two:
         #       self.raise_missing_datetime_two()
         ('2015-12-12 13:00 foo@bar', 'verify_both', {
+            # FIXME/2020-12-22: Did this error message change?
+            #                   I may have added to exception?
+            #                   Regardless, current error message for DEVs;
+            #                   go back to "expected to find ... separated."
+            # 2020-12-22 03:37: AHA! The lenient=True/False issue!
+            # When lenient=True, get lame error:
+            #  'err': 'No reference time for antecedent(fact).',
             'err': 'Expected to find the two datetimes separated by one of: ',
         }),
         # Test the second branch of same, immediately following previous.
         ('2015-12-12 13:00: foo@bar', 'verify_both', {
+            # FIXME/2020-12-22: See previous note about error message change?
             'err': 'Expected to find the two datetimes separated by one of: ',
+            #'err': 'No reference time for antecedent(fact).',
+            #'err': 'Expected to find an Activity name.',
         }),
 
         # *** Test tags.
@@ -293,15 +316,17 @@ factoid_fixture = (
         # No act@cat but tags and description, tests `parse_tags_and_remainder`
         # self.re_item_sep.match branch.
         ('2015-12-12 13:00: #baz: bat', 'verify_start', {
-            'start_raw': datetime.datetime(2015, 12, 12, 13, 0, 0),
-            'end_raw': None,
-            'start': datetime.datetime(2015, 12, 12, 13, 0, 0),
-            'end': None,
-            'activity': '',
-            'category': '',
-            'tags': ['baz'],
-            'description': 'bat',
-            'warnings': [],
+            'err': 'Expected to find an Activity name.',
+            # If lenient=True:
+            #  'start_raw': datetime.datetime(2015, 12, 12, 13, 0, 0),
+            #  'end_raw': None,
+            #  'start': datetime.datetime(2015, 12, 12, 13, 0, 0),
+            #  'end': None,
+            #  'activity': '',
+            #  'category': '',
+            #  'tags': ['baz'],
+            #  'description': 'bat',
+            #  'warnings': [],
         }),
 
         # (lb): This one... may or may be making the best decision:
@@ -391,24 +416,16 @@ factoid_fixture = (
 
         # Test must_parse_datetimes_known `not self.raw_datetime1` if-branch.
         ('-90: foo@bar', 'verify_end', {
-            'start_raw': None,
-            'end_raw': '-90',
-            'start': None,
-            'end': datetime.datetime(2015, 12, 25, 16, 30, 0),
-            'activity': 'foo',
-            'category': 'bar',
-            'tags': [],
-            'description': '',
-            'warnings': [],
+            'err': 'Please specify `start` for Fact being added before time existed.',
         }),
 
-        # Note that you should not include the time verb
-        # (which is encapsulated in the time_hint).
-        ('to -90: foo@bar', 'verify_end', {
-            'start_raw': None,
-            'end_raw': datetime.datetime(1990, 12, 25, 0, 0, 0),
-            'start': None,
-            'end': datetime.datetime(1990, 12, 25, 0, 0, 0),
+        # Test must_parse_datetimes_known `not self.raw_datetime1` if-branch.
+        ('-120 to -90: foo@bar', 'verify_both', {
+            'start_raw': -120,
+            'end_raw': '-90',
+            #  I.e., 120 and 90 minutes before now.
+            'start': datetime.datetime(2015, 12, 25, 16, 0, 0),
+            'end': datetime.datetime(2015, 12, 25, 16, 30, 0),
             'activity': 'foo',
             'category': 'bar',
             'tags': [],
@@ -464,13 +481,28 @@ factoid_fixture = (
             'err': '',
         }),
 
-        # Obscure Factoid covers last branch in `must_parse_datetime_from_rest`.
         ('+10m to @', 'verify_start', {
+            'err': 'Start after end!',
+        }),
+
+# HEREHERE
+        # FIXME/2020-12-22 03:42: Raises ValueError!
+        #   raise ValueError(_('Unable to extract activity name'))
+#        ('+10m to +20m @', 'verify_both', {
+#            'err': 'Unable to extract activity name.',
+#        }),
+
+        # Obscure Factoid covers last branch in `must_parse_datetime_from_rest`.
+        # Note that start=+ time makes sense in context on import, where there
+        # will be a previous Fact to reference, but in this fixture, this Fact
+        # stands alone, so supply relative end to avoid default end = now.
+        ('+10m to +20m foo@', 'verify_both', {
             'start_raw': '+10m',
             'end_raw': None,
-            'start': datetime.datetime(2015, 12, 25, 18, 0, 0),
-            'end': None,
-            'activity': 'to',
+            'start': datetime.datetime(2015, 12, 25, 18, 10, 0),
+            # Note the +20m is relative to start, not now (which was used on start).
+            'end': datetime.datetime(2015, 12, 25, 18, 30, 0),
+            'activity': 'foo',
             'category': '',
             'tags': [],
             'description': '',
@@ -481,28 +513,53 @@ factoid_fixture = (
 
         # Test `if two_is_okay`-`elif strictly_two` in `must_parse_datetimes_magic`.
         ('+10m foo@bar', 'verify_both', {
+            # FIXME/2020-12-22: See other notes about error message change -- fix?
             'err': 'Expected to find the two datetimes separated by one of: ',
+            #'err': 'No reference time for antecedent(fact).',
         }),
 
         # Test `if not self.raw_datetime1`-`== 'verify_end'`
         # in `must_parse_datetimes_magic`.
         ('Monday foo@bar', 'verify_end', {
             'err': 'Expected to find the two datetimes separated by one of: ',
+            # lenient=True:
+            #  'err': 'Please specify `start` for Fact being added before time existed.',
         }),
 
-        # Test `if not self.raw_datetime1`-`!= 'verify_end'`
-        # in `must_parse_datetimes_magic`.
-        ('Monday foo@bar', 'verify_start', {
+        ('Tuesday foo@bar', 'verify_start', {
             'err': 'Expected to find a datetime.',
+# ParserMissingDatetimeOneException('Expected to find a datetime.')
+#            'start_raw': 'Tuesday',
+#            'end_raw': None,
+#            #'start': datetime.datetime(2015, 12, 24, 18, 0, 0),
+#            'start': datetime.datetime(2015, 12, 25, 18, 0, 0),
+#            'end': None,
+#            'activity': 'foo',
+#            'category': 'bar',
+#            'tags': [],
+#            'description': '',
+#            'warnings': [],
         }),
 
+# HEREHERE
+        # FIXME/2020-12-22 03:42: Raises ValueError -- lenient=False, probably,
+        # but FIXME: shouldn't this print error message and not stack trace??
+# FIXME/2020-12-22 03:58: WAIT: Should no-activity be allowed????
+# - WHAT HAPPENS IN dob WHEN YOU MAKE NEW FACT NO ACT?
+        #
+        # ('Tuesday to 12:00 @', 'verify_both', {
+        #   raise ValueError(_('Unable to extract activity name'))
+# FOR NOW:
         # Cover final line in must_parse_datetimes_magic.
-        ('Tuesday to 12:00 @', 'verify_start', {
-            'start_raw': datetime.datetime(2015, 12, 22, 0, 0, 0),
+#        ('Tuesday to 12:00: @', 'verify_both', {
+        ('Tuesday to 12:00: foo@', 'verify_both', {
+            'start_raw': 'Tuesday',
             'end_raw': '12:00',
+            # freeze_time is 2015-12-25 Friday; 22 is Tuesday.
             'start': datetime.datetime(2015, 12, 22, 0, 0, 0),
-            'end': '12:00',
-            'activity': '',
+            'end': datetime.datetime(2015, 12, 22, 12, 0, 0),
+#            'activity': '',
+            'activity': 'foo',
             'category': '',
             'tags': [],
             'description': '',

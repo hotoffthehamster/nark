@@ -161,14 +161,34 @@ class Parser(object):
     # **************************************
 
     def setup_patterns(self):
-        self.re_setup_datatimes_separator()
+        self.re_setup_datetimes_separator()
         self.re_setup_category_and_tags()
         self.re_setup_tags_upon_tags()
 
-    def re_setup_datatimes_separator(self):
+    def re_setup_datetimes_separator(self):
+        # 2020-12-22: (lb): I had this splitting 'digit-digit'
+        # (without spaces) but ran into issue on YYYY-MM-DD,
+        # not sure how I didn't see this before. Was:
+        #    r'\s(to|until|\-)\s|(?<=\d)(\-)(?=\d)'
+        # See instead simple split('-') if this regex matchless
+        # and the string under parse only contains a single dash.
+        # Groups: (?:...) is non-capturing, so just the to/until/-.
         Parser.RE_DATE_TO_DATE_SEP = re.compile(
-            r'\s(to|until|\-)\s|(?<=\d)(\-)(?=\d)'
+            r'(?:^|\s)(to|until|\-)\s'
         )
+
+    def re_split_datetimes_separator(self, rest):
+        # Prefer ' to ', ' until ', and ' - ', but fallback to
+        # splitting on '-' without one or both word boundaries.
+        # To protect against splitting Y-M-D, e.g., '2012-12-12'
+        # splitting to '2012' and '12-12', only split on lonely sep.
+        parts = Parser.RE_DATE_TO_DATE_SEP.split(rest, 1)
+        if len(parts) == 1 and rest.count('-') == 1:
+            parts = rest.split('-')
+            # Add middle part to match RE_DATE_TO_DATE_SEP parts.
+            parts[1:1] = '-'
+
+        return parts
 
     def re_setup_category_and_tags(self):
         # FIXME/2018-05-15: (lb): Should #|@ be settable, like the other
@@ -363,24 +383,20 @@ class Parser(object):
         # If sep is nonempty (e.g., ':', or ','), do not expect datetime2.
         if not sep:
             # The next token in rest could be the "to"/"until"/"-" sep.
-            parts = Parser.RE_DATE_TO_DATE_SEP.split(rest, 1)
+            parts = self.re_split_datetimes_separator(rest)
             # ... however, the RE_DATE_TO_DATE_SEP regex matches anywhere in line.
             # So verify that first part of split is empty, otherwise to/until sep
             # does not start the rest of the factoid.
             if (parts[0].strip() == '') and (len(parts) > 1):
-                # There are four capture groups:
-                #   1. The stuff before the times;
-                #   2. The 'to'/'until'/'-', if separator matched on word boundary,
-                #        e.g., "X to Y"; otherwise, None.
-                #   3. The '-', if separator matched on digit boundary,
-                #        e.g., "9-5"; otherwise, None.
-                #   4. The stuff after the (2.) or (3.) separator.
-                assert len(parts) == 4
-                assert (parts[1] is None) ^ (parts[2] is None)
-                separator = parts[1] or parts[2]
+                # There are three capture groups:
+                #   1. The stuff before the separator ('' here, b/c sep starts rest);
+                #   2. The 'to'/'until'/'-' separator;
+                #   4. Everything following separator.
+                assert len(parts) == 3
+                separator = parts[1]
                 assert separator in DATE_TO_DATE_SEPARATORS__RAW
                 after_dt2, _sep = self.must_parse_datetime_from_rest(
-                    parts[3], 'datetime2', ok_if_missing=(not strictly_two),
+                    parts[2], 'datetime2', ok_if_missing=(not strictly_two),
                 )
                 if after_dt2 is not None:
                     rest = after_dt2
@@ -459,15 +475,13 @@ class Parser(object):
 
         if two_is_okay:
             # Look for separator, e.g., " to ", or " until ", or " - "/"-", etc.
-            parts = Parser.RE_DATE_TO_DATE_SEP.split(datetimes, 1)
+            parts = self.re_split_datetimes_separator(datetimes)
             if len(parts) > 1:
-                assert len(parts) == 4  # middle 2 parts are the separator
-                assert (parts[1] is None) ^ (parts[2] is None)
-                separator = parts[1] or parts[2]
+                assert len(parts) == 3  # middle part is the separator
+                separator = parts[1]
                 assert separator in DATE_TO_DATE_SEPARATORS__RAW
-
                 self.raw_datetime1 = parts[0]  # first datetime
-                self.raw_datetime2 = parts[3]  # other datetime
+                self.raw_datetime2 = parts[2]  # other datetime
             elif strictly_two:
                 self.raise_missing_datetime_two()
 
@@ -487,15 +501,13 @@ class Parser(object):
 
         if two_is_okay:
             # Look for separator, e.g., " to ", or " until ", or " - ", etc.
-            parts = Parser.RE_DATE_TO_DATE_SEP.split(datetimes_and_act, 1)
+            parts = self.re_split_datetimes_separator(datetimes_and_act)
             if len(parts) > 1:
-                assert len(parts) == 4
-                assert (parts[1] is None) ^ (parts[2] is None)
-                separator = parts[1] or parts[2]
+                assert len(parts) == 3
+                separator = parts[1]
                 assert separator in DATE_TO_DATE_SEPARATORS__RAW
-
                 self.raw_datetime1 = parts[0]
-                dt_and_act = parts[3]
+                dt_and_act = parts[2]
                 dt_attr = 'datetime2'
             elif strictly_two:
                 self.raise_missing_datetime_two()

@@ -33,7 +33,7 @@ from nark.tests.item_factories import *  # noqa: F401, F403
 pytest_plugins = (
 # 2020-12-22: So far not needed.
     # Import tmp_appdirs fixture.
-#    'easy_as_pypi_apppth.test_mock',
+#    'easy_as_pypi_apppth.tests.appdirs_mock',
 
     # Set KeyChainedValue._envvar_prefix.
 #    'tests.config.envvar_prefix',

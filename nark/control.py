@@ -67,15 +67,20 @@ class NarkControl(object):
     """
 
     def __init__(self, config=None):
-        if config:
-            self.capture_config_lib(config)
+        self.capture_config(config)
 
-    def capture_config_lib(self, config):
+    def capture_config(self, config):
+        if not config:
+            return
+
         self.config = decorate_config(config)
+
         self.lib_logger = self._get_logger()
         # Profiling: _get_store(): Observed: ~ 0.136 to 0.240 secs.
         self.store = self._get_store()
         self.sql_logger = self._sql_logger()
+
+    # ***
 
     def standup_store(self):
         created_fresh = self.store.standup()
@@ -100,6 +105,8 @@ class NarkControl(object):
     @property
     def facts(self):
         return self.store.facts
+
+    # ***
 
     # 2020-01-07: (lb): Only called by 1 test.
     def update_config(self, config):
@@ -126,6 +133,8 @@ class NarkControl(object):
         cls = getattr(backend_module, storeclass)
         store = cls(self.config)
         return store
+
+    # ***
 
     def _get_logger(self):
         """

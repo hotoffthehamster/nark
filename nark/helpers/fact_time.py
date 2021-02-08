@@ -132,7 +132,11 @@ def day_end_time(start_time):
 #    '^(?P<hours>\d{2}):(?P<minutes>\d{2})$'
 # - Note that colons (':') are used to separate parts.
 RE_PATTERN_RELATIVE_CLOCK = re.compile(
-    '^(?P<hours>\d{1,2}):?(?P<minutes>\d{2})(:(?P<seconds>\d{2}))?$'
+    # 2021-02-07: This allows incorrect times, like '123:45':
+    #  '^(?P<hours>\d{1,2}):?(?P<minutes>\d{2})(:(?P<seconds>\d{2}))?$'
+    # To reject such a candidate string, but to keep the regex simple,
+    # we'll capture the hours:minutes separator and look for it in post.
+    '^(?P<hours>\d{1,2})(?P<hm_sep>:?)(?P<minutes>\d{2})(:(?P<seconds>\d{2}))?$'
 )
 
 
@@ -198,21 +202,41 @@ def must_not_start_after_end(range_tuple):
 
 
 def parse_clock_time(clock_time):
-    parsed_ct = None
-    match = RE_PATTERN_RELATIVE_CLOCK.match(clock_time)
-    if match:
+
+    def _parse_clock_time(clock_time):
+        match = RE_PATTERN_RELATIVE_CLOCK.match(clock_time)
+        if not match:
+            return None
+
+        return split_and_verify_match(match)
+
+    def split_and_verify_match(match):
         parts = match.groupdict()
-        parsed_ct = (
-            parts['hours'],
-            parts['minutes'],
-            parts['seconds'] or '0',
-        )
-    if (
-        not parsed_ct
-        or (int(parsed_ct[0]) < 0 or int(parsed_ct[0]) > 24)
-        or (int(parsed_ct[1]) < 0 or int(parsed_ct[1]) > 59)
-        or (int(parsed_ct[2]) < 0 or int(parsed_ct[2]) > 59)
-    ):
-        parsed_ct = None
-    return parsed_ct
+
+        if parts['seconds'] is not None and not parts['hm_sep']:
+            # This is a false positive, e.g., '123:45' or '1234:56'.
+            return None
+
+        # Seconds is not required by the regex, so ensure not None.
+        parts['seconds'] = parts['seconds'] or 0
+
+        # Note that callers are not expecting integers, per se,
+        # but are at least expecting int-coercible components.
+        # At least historically this function returned strings;
+        # now it returns integers, but callers don't mind either.
+        for component in ('hours', 'minutes', 'seconds'):
+            parts[component] = int(parts[component])
+
+        if (
+            (parts['hours'] < 0 or parts['hours'] > 24)
+            or (parts['minutes'] < 0 or parts['minutes'] > 59)
+            or (parts['seconds'] < 0 or parts['seconds'] > 59)
+        ):
+            parsed_ct = None
+        else:
+            parsed_ct = (parts['hours'], parts['minutes'], parts['seconds'])
+
+        return parsed_ct
+
+    return _parse_clock_time(clock_time)
 

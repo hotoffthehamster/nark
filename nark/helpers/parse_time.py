@@ -164,9 +164,13 @@ class HamsterTimeSpec(object):
             '(?P<relative>([-+]?(\d+h)|[-+](\d+h)?\d+m?))'
         )
 
-        # BEWARE: Does not verify hours and minutes in range 0..59.
+        # Note: This regex does not verify hours and minutes in range 0..59.
+        # - Whatever matches this, we'll re-parse with parse_clock_time, which
+        #   does a more thorough match.
         pattern_just_clock = (
-            '(?P<clock_time>\d{1,2}:?\d{2}(:\d{2})?)'
+            '(?P<clock_time>'
+            '(?:(\d{1,2}:\d{2}:\d{2}|\d{1,2}:?\d{2}))'
+            ')'
         )
 
         # (lb): Treat 4 digits as clock time, not year, i.e.,

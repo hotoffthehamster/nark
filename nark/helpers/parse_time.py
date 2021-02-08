@@ -172,6 +172,7 @@ class HamsterTimeSpec(object):
         pattern_just_clock = (
             '(?P<clock_time>'
             '(?:(\d{1,2}:\d{2}:\d{2}|\d{1,2}:?\d{2}))'
+            '(?:(a|am|A|AM|p|pm|P|PM)?)'
             ')'
         )
 

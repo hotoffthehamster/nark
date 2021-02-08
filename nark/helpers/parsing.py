@@ -59,6 +59,7 @@ FACT_METADATA_SEPARATORS = [",", ":"]
 
 # Map time_hint to minimum and maximum datetimes to seek.
 TIME_HINT_CLUE = {
+    'verify_unset': (1, 2),  # end time is optional.
     'verify_start': (1, 2),  # end time is optional.
     'verify_end': (1, 1),  # exactly one is required.
     'verify_then': (0, 2),  # both times are optional.
@@ -404,6 +405,21 @@ class Parser(object):
                 # else, was not a datetime, so re-include DATE_TO_DATE_SEPARATOR.
             elif strictly_two:
                 self.raise_missing_datetime_two()
+            elif self.time_hint == 'verify_unset':
+                # Special case: This is input like '123 foo bar' or '1:23 foo bar'
+                # (and not, e.g., 'at 123 foo bar'). Question is, should this be
+                # considered the start time or not? Like, '123 friends showed up'
+                # vs '1:23 friends showed up'. / 2021-02-07: Because this path has
+                # not existed until now, let's go with being more exclusive, and
+                # starting with the numbers-only exclusion.
+                if ':' not in self.datetime1:
+                    # Assume that user just started a line in a Fact description
+                    # with a number that *could* pass for clock time, but let's
+                    # not treat it as such.
+                    # MAYBE: If someone raises issue with clock-like leading
+                    # text that isn't the start time, let me know, we can tweak
+                    # this more!
+                    self.raise_missing_datetime_one()
         elif strictly_two:
             self.raise_missing_datetime_two()
         return rest

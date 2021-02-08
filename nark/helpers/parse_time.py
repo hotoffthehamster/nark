@@ -159,10 +159,12 @@ class HamsterTimeSpec(object):
         #
         #           RE_HAMSTER_TIME.match('2018-05-14 22:29:24.123x456+00:02')
 
-        # Never forget! Hamster allows relative time!
+        # Perhaps a lesser known feature: Hamster allows relative time!!
         pattern_relative = (
             '(?P<relative>([-+]?(\d+h)|[-+](\d+h)?\d+m?))'
         )
+
+        # Reminder: (?:...) is a non-capturing group.
 
         # Note: This regex does not verify hours and minutes in range 0..59.
         # - Whatever matches this, we'll re-parse with parse_clock_time, which
@@ -263,7 +265,7 @@ def parse_dated(dated, time_now, cruftless=False):
         # else, relative time, or clock time; let caller handle.
         elif type_dt == 'clock_time':
             # Note that HamsterTimeSpec.discern is a little lazy and does
-            # not verify the clock time is sane values, e.g., hours and
+            # not verify the clock time is valid values, e.g., hours and
             # minutes between 0..59. But parse_clock_time cares.
             clock_time = parse_clock_time(dt)
             if not clock_time:
@@ -295,8 +297,12 @@ def parse_dated(dated, time_now, cruftless=False):
 #   inputs, e.g., `Monday` and `January`.
 # - But strict parsing also allows input we'd like to ignore, e.g., even if
 #   strict, `18:555` parses to Datetime(2055, 1, 8, 5, 0). What a stretch!
-# - So we do an upfront check and skip the friendly parser if the input
-#   is only numbers, whitespace, and/or punctuation, but no alpha characters.
+# - Note that a parser higher up in nark will have gone the quick route and
+#   parsed the value already as a datetime if it was all numbers and maybe
+#   some punctuation, e.g., something of the format `YYYY-MM-DD` or `HH:MM`
+#   or similar. It's not relying on the dateparser for these simple queries.
+# - So do an upfront check and skip the friendly parser if the input is
+#   only numbers, whitespace, and/or punctuation, but no alpha characters.
 
 RE_ONLY_09_WH_AND_PUNCT = re.compile(r'^[0-9\s{}]+$'.format(re.escape(punctuation)))
 
@@ -362,6 +368,9 @@ def parse_datetime_get_settings(time_now=None, local_tz=None):
         # ago, but adjusted another 6 hours for 'America/Chicago'. IDGI, but
         # apparently being explicit here fixes the issue.
         'TIMEZONE': 'UTC',
+
+        # FEAT_REQ/2021-02-07: Should probably make date format configurable:
+        # 'DATE_ORDER': 'MDY'|'DMY'|'YMD'|'YDM'
     }
 
     if time_now:
@@ -379,6 +388,9 @@ def parse_datetime_get_settings(time_now=None, local_tz=None):
 
 
 def parse_datetime_human(datepart, time_now=None, local_tz=None):
+    # Bouncer (aka Guard Clause): Callers have done their due diligence to
+    # handler input that's numbers and punctuation only, so return early if
+    # so.
     if RE_ONLY_09_WH_AND_PUNCT.match(datepart) is not None:
         return
 
@@ -394,6 +406,64 @@ def parse_datetime_human(datepart, time_now=None, local_tz=None):
     parsed = ddp['date_obj']
 
     return parsed
+
+# DateDataParser Notes
+# ====================
+#
+# 2021-02-07: Note that dateparser uses non-numeric text as a language hint.
+#
+# Normally we don't care too much, because we're trying to be generous and
+# let the user express themselves as loosely as possible. But the presence
+# of text has some nuance that might be of interest, especially if you're
+# trying to troubleshoot a peculiar parse result. (Which is why I ended
+# up documenting this; normally the dob-import file-level parse_input.py
+# parser strips a 'to' prefix, as in 'to YYYY-MM-DD', but it had been
+# letting 'to' slip through if the line started with punctuation, e.g.,
+# '[to YYYY-MM-DD...]', which led me to make the following observations.)
+#
+# For an example of how dateparser reacts to text, consider this setup:
+#
+#   (Pdb) ddp = dateparser.DateDataParser(settings=settings)
+#
+# Then, for example, a datetime string without text defaults to English:
+#
+#                          v (no prefix)
+#   (Pdb) ddp.get_date_data('2021-02-05 22:04')
+#   {'date_obj': datetime.datetime(2021, 2, 5, 22, 4), 'locale': 'en', ...}
+#                                       ^^^^^ February 5   English^^
+#
+# But adding a seemingly innocuous 'o' prefix causes it to be interpreted
+# as Polish, which defaults to Y-D-M, not Y-M-D, e.g.,
+#
+#                            v ('o')
+#   (Pdb) ddp.get_date_data('o 2021-02-05 22:04')
+#   {'date_obj': datetime.datetime(2021, 5, 2, 22, 4), 'locale': 'pl', ...}
+#                                       ^^^^^ May 2        Polish ^^
+#
+# Going one character further, change 'o' to 'to' and it's considereds Finnish:
+#
+#                            vv ('to')
+#   (Pdb) ddp.get_date_data('to 2021-02-05 22:04')
+#   {'date_obj': datetime.datetime(2021, 5, 2, 22, 4), 'locale': 'fi', ...}
+#                                       ^^^^^ May 2       Finnish ^^
+#
+# And then if the prefix is not a recognized article of speech from a supported
+# language, it won't match at all, e.g.,
+#
+#   (Pdb) ddp.get_date_data('lo 2021-02-05 22:04')
+#   {'date_obj': None, 'period': 'day', 'locale': None}
+#
+# Knowing that, we can probably guess the result if we indicate "the" date,
+# mais *en français*:
+#
+#   (Pdb) ddp.get_date_data('le 2021-02-05 22:04')
+#   {'date_obj': datetime.datetime(2021, 5, 2, 22, 4), 'locale': 'fr', ...}
+#
+# And finally here's what it looks like for English, using "the", and also
+# including punctuation to show that DateDataParser ignores it:
+#
+#   (Pdb) ddp.get_date_data('*$%![the 2021-02-05 22:04')
+#   {'date_obj': datetime.datetime(2021, 2, 5, 22, 4), 'locale': 'en', ...}
 
 
 # ***
